@@ -99,6 +99,12 @@ impl ItemBehavior for CompassItem {
         }
 
         let target_pos = target.pos();
+        if !world.is_in_valid_bounds(target_pos) {
+            let new_tracker = LodestoneTracker::new(None, true);
+            stack.set(LODESTONE_TRACKER, new_tracker);
+            return;
+        }
+
         if !world.is_full_chunk_loaded_at(target_pos) {
             return;
         }
@@ -198,6 +204,34 @@ mod tests {
         assert!(
             tracker.target().is_none(),
             "target should be invalidated and set to None"
+        );
+    }
+
+    #[test]
+    fn compass_invalidates_target_outside_world_bounds() {
+        init_globals_once();
+
+        let world = fresh_test_world("compass_bounds_test_world");
+        let player = TestPlayerBuilder::new(Arc::clone(&world), "CompassTester", 1)
+            .uuid(Uuid::from_u128(1))
+            .build();
+
+        let invalid_pos = BlockPos::new(40_000_000, 64, 0);
+        let tracker =
+            LodestoneTracker::new(Some(GlobalPos::new(world.key.clone(), invalid_pos)), true);
+
+        let mut compass = ItemStack::new(&vanilla_items::COMPASS);
+        compass.set(LODESTONE_TRACKER, tracker);
+
+        let behavior = CompassItem;
+        behavior.inventory_tick(&mut compass, &world, &player, 0, true);
+
+        let tracker = compass
+            .get(LODESTONE_TRACKER)
+            .expect("should keep lodestone tracker component");
+        assert!(
+            tracker.target().is_none(),
+            "target should be immediately invalidated and set to None"
         );
     }
 }
