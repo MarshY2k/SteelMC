@@ -106,6 +106,15 @@ impl ChestMinecartEntity {
     const fn nbt_bool(value: bool) -> i8 {
         if value { 1 } else { 0 }
     }
+
+    fn drop_contents(&self) {
+        let mut inventory = self.inventory.lock();
+        for item in inventory.items_mut() {
+            if !item.is_empty() {
+                self.spawn_at_location(item.split(item.count()), 0.0);
+            }
+        }
+    }
 }
 
 impl Entity for ChestMinecartEntity {
@@ -264,6 +273,7 @@ impl Entity for ChestMinecartEntity {
             });
 
         if is_creative {
+            self.drop_contents();
             self.set_removed(RemovalReason::Killed);
             return true;
         }
@@ -281,6 +291,7 @@ impl Entity for ChestMinecartEntity {
         vehicle.id_hurtdir.set(-*vehicle.id_hurtdir.get());
 
         if new_damage > 40.0 {
+            self.drop_contents();
             self.spawn_at_location(ItemStack::new(&vanilla_items::CHEST_MINECART), 0.0);
             self.set_removed(RemovalReason::Killed);
         }
@@ -502,5 +513,51 @@ mod tests {
                 .abs()
                 < f64::EPSILON
         );
+    }
+
+    #[test]
+    fn chest_minecart_destruction_drops_inventory_contents() {
+        use crate::behavior::init_behaviors;
+        use crate::entity::SharedEntity;
+        use crate::test_support::{fresh_test_world, insert_ready_full_chunk};
+        use steel_registry::init_vanilla_registry;
+        use steel_utils::ChunkPos;
+
+        init_vanilla_registry();
+        init_behaviors();
+        crate::entity::init_entities();
+
+        let world = fresh_test_world("chest_minecart_drop_contents");
+        insert_ready_full_chunk(&world, ChunkPos::new(0, 0));
+
+        let minecart = Arc::new(ChestMinecartEntity::new(
+            &vanilla_entities::CHEST_MINECART,
+            crate::entity::next_entity_id(),
+            DVec3::new(0.5, 64.0, 0.5),
+            Arc::downgrade(&world),
+        ));
+        world
+            .try_add_entity(Arc::clone(&minecart) as SharedEntity)
+            .expect("should add chest minecart");
+
+        {
+            let mut inv = minecart.inventory.lock();
+            inv.set_item(0, ItemStack::with_count(&vanilla_items::DIAMOND, 5));
+            inv.set_item(1, ItemStack::with_count(&vanilla_items::GOLD_INGOT, 10));
+        }
+
+        let damage_source =
+            DamageSource::environment(&steel_registry::vanilla_damage_types::GENERIC);
+        let killed = minecart.hurt(&world, &damage_source, 5.0);
+        assert!(killed);
+        assert!(minecart.is_removed());
+
+        let dropped_items = world.get_entities_in_aabb_matching(
+            &steel_utils::WorldAabb::new(0.0, 63.0, 0.0, 2.0, 66.0, 2.0),
+            |e| e.entity_type() == &vanilla_entities::ITEM,
+        );
+
+        // Expect 3 item entities dropped: DIAMOND x5, GOLD_INGOT x10, and CHEST_MINECART x1
+        assert_eq!(dropped_items.len(), 3);
     }
 }
