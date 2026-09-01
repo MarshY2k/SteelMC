@@ -40,8 +40,9 @@ impl ItemBehavior for CompassItem {
             return InteractionResult::Pass;
         }
 
-        context.world.play_block_sound(
+        context.world.play_sound(
             &sound_events::ITEM_LODESTONE_COMPASS_LOCK,
+            SoundSource::Players,
             pos,
             1.0,
             1.0,
