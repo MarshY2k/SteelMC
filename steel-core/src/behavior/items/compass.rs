@@ -99,7 +99,7 @@ impl ItemBehavior for CompassItem {
         }
 
         let target_pos = target.pos();
-        if !world.is_in_valid_bounds(target_pos) {
+        if !world.is_in_world_bounds(target_pos) {
             let new_tracker = LodestoneTracker::new(None, true);
             stack.set(LODESTONE_TRACKER, new_tracker);
             return;
