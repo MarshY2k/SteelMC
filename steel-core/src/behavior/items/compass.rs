@@ -52,24 +52,33 @@ impl ItemBehavior for CompassItem {
         let dimension = context.world.key.clone();
         let tracker = LodestoneTracker::new(Some(GlobalPos::new(dimension, pos)), true);
 
-        let result_stack = context.inv.with_item(|item| {
-            let mut stack = item.clone();
-            stack.set_count(1);
-            stack.set(LODESTONE_TRACKER, tracker);
-            stack
-        });
+        let has_infinite_materials = context.player.has_infinite_materials();
 
         let leftover = context.inv.with_inventory(|inv| {
-            inv.apply_filled_result(
-                context.hand,
-                result_stack,
-                context.player.has_infinite_materials(),
-                true,
-            )
+            let held_count = inv.get_item_in_hand(context.hand).count();
+
+            if !has_infinite_materials && held_count == 1 {
+                inv.mutate_item_in_hand(context.hand, |item| item.set(LODESTONE_TRACKER, tracker));
+                return ItemStack::empty();
+            }
+
+            let mut result_stack = inv.get_item_in_hand(context.hand).clone();
+            result_stack.set_count(1);
+            result_stack.set(LODESTONE_TRACKER, tracker);
+
+            if !has_infinite_materials {
+                inv.shrink_item_in_hand(context.hand, 1);
+            }
+
+            if inv.add(&mut result_stack) {
+                ItemStack::empty()
+            } else {
+                result_stack
+            }
         });
 
         if !leftover.is_empty() {
-            let _ = context.player.drop_item(leftover, false, true);
+            let _ = context.player.drop_item(leftover, false, false);
         }
 
         InteractionResult::Success
