@@ -518,21 +518,21 @@ mod tests {
     #[test]
     fn chest_minecart_destruction_drops_inventory_contents() {
         use crate::behavior::init_behaviors;
-        use crate::entity::SharedEntity;
+        use crate::entity::{SharedEntity, init_entities, next_entity_id};
         use crate::test_support::{fresh_test_world, insert_ready_full_chunk};
-        use steel_registry::init_vanilla_registry;
+        use steel_registry::{init_vanilla_registry, vanilla_damage_types};
         use steel_utils::ChunkPos;
 
         init_vanilla_registry();
         init_behaviors();
-        crate::entity::init_entities();
+        init_entities();
 
         let world = fresh_test_world("chest_minecart_drop_contents");
         insert_ready_full_chunk(&world, ChunkPos::new(0, 0));
 
         let minecart = Arc::new(ChestMinecartEntity::new(
             &vanilla_entities::CHEST_MINECART,
-            crate::entity::next_entity_id(),
+            next_entity_id(),
             DVec3::new(0.5, 64.0, 0.5),
             Arc::downgrade(&world),
         ));
@@ -546,8 +546,7 @@ mod tests {
             inv.set_item(1, ItemStack::with_count(&vanilla_items::GOLD_INGOT, 10));
         }
 
-        let damage_source =
-            DamageSource::environment(&steel_registry::vanilla_damage_types::GENERIC);
+        let damage_source = DamageSource::environment(&vanilla_damage_types::GENERIC);
         let killed = minecart.hurt(&world, &damage_source, 5.0);
         assert!(killed);
         assert!(minecart.is_removed());
