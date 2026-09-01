@@ -4,8 +4,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MINECRAFT_SRC_DIR="$SCRIPT_DIR/minecraft-src"
 
-# Create temp directory on G: drive to save space on C:
-TEMP_DIR="/mnt/g/SteelMC/.gitcraft-tmp"
+# Create temp directory on same filesystem to avoid cross-device link errors
+TEMP_DIR="$SCRIPT_DIR/.gitcraft-tmp"
 rm -rf "$TEMP_DIR"
 mkdir -p "$TEMP_DIR"
 echo "Cloning GitCraft into $TEMP_DIR..."
