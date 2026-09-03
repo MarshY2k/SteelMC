@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use steel_macros::item_behavior;
+use steel_protocol::packets::game::SoundSource;
 use steel_registry::{
     blocks::block_state_ext::BlockStateExt,
     data_components::{
@@ -14,6 +15,7 @@ use steel_registry::{
 use text_components::TextComponent;
 
 use crate::behavior::{InteractionResult, ItemBehavior, UseOnContext};
+use crate::inventory::container::Container;
 use crate::player::Player;
 use crate::world::World;
 
@@ -66,9 +68,7 @@ impl ItemBehavior for CompassItem {
             result_stack.set_count(1);
             result_stack.set(LODESTONE_TRACKER, tracker);
 
-            if !has_infinite_materials {
-                inv.shrink_item_in_hand(context.hand, 1);
-            }
+            inv.mutate_item_in_hand(context.hand, |item | item.consume_one(has_infinite_materials));
 
             if inv.add(&mut result_stack) {
                 ItemStack::empty()
