@@ -15,7 +15,7 @@ use steel_utils::types::InteractionHand;
 use text_components::TextComponent;
 
 use crate::behavior::items::DefaultItemBehavior;
-use crate::behavior::{InteractionResult, UseItemContext, UseOnContext};
+use crate::behavior::{InteractionResult, InventoryTickContext, UseItemContext, UseOnContext};
 use crate::entity::damage::DamageSource;
 use crate::entity::{Entity, LivingEntity};
 use crate::player::{Player, player_inventory::EquipmentSwapResult};
@@ -184,16 +184,8 @@ pub trait ItemBehavior: Send + Sync {
     ) {
     }
 
-    /// Called every tick for each item stack in a player's inventory.
-    fn inventory_tick(
-        &self,
-        _stack: &mut ItemStack,
-        _world: &Arc<World>,
-        _player: &Player,
-        _slot: usize,
-        _selected: bool,
-    ) {
-    }
+    /// Called every tick for each carried item.
+    fn inventory_tick(&self, _context: &mut InventoryTickContext<'_>) {}
 
     /// Returns how much durability this weapon consumes after a successful entity hit.
     fn item_damage_per_attack(&self, stack: &ItemStack) -> Option<i32> {

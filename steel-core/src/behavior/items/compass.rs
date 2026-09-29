@@ -1,27 +1,25 @@
 use std::borrow::Cow;
-use std::sync::Arc;
 
 use steel_macros::item_behavior;
 use steel_protocol::packets::game::SoundSource;
 use steel_registry::{
+    RegistryEntry as _,
     blocks::block_state_ext::BlockStateExt,
     data_components::{
         components::{GlobalPos, LodestoneTracker},
         vanilla_components::LODESTONE_TRACKER,
     },
     item_stack::ItemStack,
-    sound_events, vanilla_blocks,
+    sound_events, vanilla_blocks, vanilla_poi_types,
 };
 use text_components::TextComponent;
 
-use crate::behavior::{InteractionResult, ItemBehavior, UseOnContext};
+use crate::behavior::{InteractionResult, InventoryTickContext, ItemBehavior, UseOnContext};
 use crate::inventory::container::Container;
-use crate::player::Player;
-use crate::world::World;
 
 use super::dynamic_name::{default_name, translated};
 
-/// Compass item behavior implementing lodestone binding and validation.
+/// Compass item behavior.
 #[item_behavior]
 pub struct CompassItem;
 
@@ -57,23 +55,19 @@ impl ItemBehavior for CompassItem {
         let has_infinite_materials = context.player.has_infinite_materials();
 
         let leftover = context.inv.with_inventory(|inv| {
-            let held_count = inv.get_item_in_hand(context.hand).count();
-
-            if !has_infinite_materials && held_count == 1 {
+            if !has_infinite_materials && inv.get_item_in_hand(context.hand).count() == 1 {
                 inv.mutate_item_in_hand(context.hand, |item| item.set(LODESTONE_TRACKER, tracker));
                 return ItemStack::empty();
             }
 
-            let mut result_stack = inv.get_item_in_hand(context.hand).clone();
-            result_stack.set_count(1);
-            result_stack.set(LODESTONE_TRACKER, tracker);
-
-            inv.mutate_item_in_hand(context.hand, |item | item.consume_one(has_infinite_materials));
-
-            if inv.add(&mut result_stack) {
+            let mut lodestone_compass = inv.mutate_item_in_hand(context.hand, |item| {
+                item.consume_and_return(1, has_infinite_materials)
+            });
+            lodestone_compass.set(LODESTONE_TRACKER, tracker);
+            if inv.add(&mut lodestone_compass) {
                 ItemStack::empty()
             } else {
-                result_stack
+                lodestone_compass
             }
         });
 
@@ -84,53 +78,49 @@ impl ItemBehavior for CompassItem {
         InteractionResult::Success
     }
 
-    fn inventory_tick(
-        &self,
-        stack: &mut ItemStack,
-        world: &Arc<World>,
-        _player: &Player,
-        _slot: usize,
-        _selected: bool,
-    ) {
-        let Some(tracker) = stack.get(LODESTONE_TRACKER) else {
+    fn inventory_tick(&self, context: &mut InventoryTickContext<'_>) {
+        let Some(target) = context
+            .with_item(|stack| {
+                stack
+                    .get(LODESTONE_TRACKER)
+                    .filter(|tracker| tracker.tracked())
+                    .and_then(|tracker| tracker.target().cloned())
+            })
+            .flatten()
+        else {
             return;
         };
 
-        if !tracker.tracked() {
-            return;
-        }
-
-        let Some(target) = tracker.target() else {
-            return;
-        };
-
+        let world = context.world;
         if world.key != *target.dimension() {
             return;
         }
 
-        let target_pos = target.pos();
-        if !world.is_in_world_bounds(target_pos) {
-            let new_tracker = LodestoneTracker::new(None, true);
-            stack.set(LODESTONE_TRACKER, new_tracker);
-            return;
+        let pos = target.pos();
+        if world.is_in_world_bounds(pos) {
+            // TODO: validate unloaded targets once POI persistence exists.
+            if !world.is_full_chunk_loaded_at(pos) {
+                return;
+            }
+            let lodestone_exists = vanilla_poi_types::LODESTONE
+                .try_id()
+                .is_some_and(|id| world.poi_storage.lock().get_type(pos) == Some(id));
+            if lodestone_exists {
+                return;
+            }
         }
 
-        if !world.is_full_chunk_loaded_at(target_pos) {
-            return;
-        }
-
-        let block_state = world.get_block_state(target_pos);
-        if block_state.get_block() != &vanilla_blocks::LODESTONE {
-            let new_tracker = LodestoneTracker::new(None, true);
-            stack.set(LODESTONE_TRACKER, new_tracker);
-        }
+        context.with_item(|stack| stack.set(LODESTONE_TRACKER, LodestoneTracker::new(None, true)));
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use crate::bootstrap::init_globals_once;
+    use crate::entity::LivingEntity;
     use crate::test_support::{TestPlayerBuilder, fresh_test_world, insert_ready_full_chunk};
     use glam::DVec3;
     use steel_registry::blocks::properties::Direction;
@@ -186,8 +176,7 @@ mod tests {
         let result = behavior.use_on(&mut context);
         assert_eq!(result, InteractionResult::Success);
 
-        let mut compass = player.inventory.lock().get_selected_item().clone();
-        assert!(!compass.is_empty());
+        let compass = player.inventory.lock().get_selected_item().clone();
         let tracker = compass
             .get(LODESTONE_TRACKER)
             .expect("should have lodestone tracker component");
@@ -196,7 +185,8 @@ mod tests {
         assert_eq!(target.pos(), pos);
         assert_eq!(*target.dimension(), world.key);
 
-        behavior.inventory_tick(&mut compass, &world, &player, 0, true);
+        InventoryTickContext::tick_player_inventory(&world, &player);
+        let compass = player.inventory.lock().get_selected_item().clone();
         let tracker = compass
             .get(LODESTONE_TRACKER)
             .expect("should keep lodestone tracker component");
@@ -207,7 +197,8 @@ mod tests {
             vanilla_blocks::AIR.default_state(),
             UpdateFlags::UPDATE_ALL
         ));
-        behavior.inventory_tick(&mut compass, &world, &player, 0, true);
+        InventoryTickContext::tick_player_inventory(&world, &player);
+        let compass = player.inventory.lock().get_selected_item().clone();
         let tracker = compass
             .get(LODESTONE_TRACKER)
             .expect("should keep lodestone tracker component");
@@ -233,9 +224,10 @@ mod tests {
         let mut compass = ItemStack::new(&vanilla_items::COMPASS);
         compass.set(LODESTONE_TRACKER, tracker);
 
-        let behavior = CompassItem;
-        behavior.inventory_tick(&mut compass, &world, &player, 0, true);
+        player.inventory.lock().set_offhand_item(compass);
+        LivingEntity::tick_equipment(player.as_ref());
 
+        let compass = player.inventory.lock().get_offhand_item().clone();
         let tracker = compass
             .get(LODESTONE_TRACKER)
             .expect("should keep lodestone tracker component");

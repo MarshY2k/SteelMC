@@ -89,7 +89,9 @@ use text_components::{
 };
 use text_components::{content::Resolvable, custom::CustomData};
 
-use crate::behavior::{BlockStateBehaviorExt as _, ITEM_BEHAVIORS, InteractionResult};
+use crate::behavior::{
+    BlockStateBehaviorExt as _, ITEM_BEHAVIORS, InteractionResult, InventoryTickContext,
+};
 use crate::chunk::chunk_request::{ChunkRequestHandle, ChunkRequestState};
 use crate::config::RuntimeConfig;
 use crate::enchantment_helper;
@@ -619,7 +621,6 @@ impl Player {
         self.reset_vehicle_movement_for_tick();
 
         self.default_tick();
-        self.tick_inventory();
         self.detect_equipment_updates();
         self.ai_step();
 
@@ -1336,20 +1337,6 @@ impl Player {
             }
         }
     }
-
-    fn tick_inventory(&self) {
-        let world = self.get_world();
-        let mut inventory = self.inventory.lock();
-        let selected = inventory.get_selected_slot() as usize;
-        for slot in 0..inventory.get_container_size() {
-            let item_stack = &mut inventory.items_mut()[slot];
-            if item_stack.is_empty() {
-                continue;
-            }
-            let behavior = ITEM_BEHAVIORS.get_behavior(item_stack.item());
-            behavior.inventory_tick(item_stack, &world, self, slot, slot == selected);
-        }
-    }
 }
 
 impl Entity for Player {
@@ -1849,6 +1836,17 @@ impl LivingEntity for Player {
         Player::die(self, source);
     }
 
+    fn tick_equipment(&self) {
+        // skip main hand because its already being ticked through player inventory
+        InventoryTickContext::tick_equipment(
+            &self.get_world(),
+            self,
+            EquipmentSlot::ALL
+                .into_iter()
+                .filter(|slot| *slot != EquipmentSlot::MainHand),
+        );
+    }
+
     fn with_equipment_slot(&self, slot: EquipmentSlot, visitor: &mut dyn FnMut(&ItemStack)) {
         let inventory = self.inventory.lock();
         visitor(inventory.get_ref(slot));
@@ -1998,6 +1996,7 @@ impl LivingEntity for Player {
     }
 
     fn ai_step(&self) -> Option<MoveResult> {
+        InventoryTickContext::tick_player_inventory(&self.get_world(), self);
         if self.is_flying() && !self.is_passenger() {
             self.reset_fall_distance();
         }
