@@ -64,7 +64,7 @@ impl ItemBehavior for CompassItem {
                 item.consume_and_return(1, has_infinite_materials)
             });
             lodestone_compass.set(LODESTONE_TRACKER, tracker);
-            if inv.add(&mut lodestone_compass) {
+            if inv.add(&mut lodestone_compass) || has_infinite_materials {
                 ItemStack::empty()
             } else {
                 lodestone_compass

@@ -728,7 +728,7 @@ impl Player {
 
             self.update_player_attributes();
             self.living_base.refresh_speed_from_attributes();
-            self.tick_regeneration();
+            self.tick_food_data();
 
             if self.is_sprinting() && !self.food_data.lock().has_enough_food() {
                 self.set_sprinting(false);
@@ -2081,6 +2081,7 @@ impl LivingEntity for Player {
     }
 
     fn ai_step(&self) -> Option<MoveResult> {
+        self.tick_regeneration();
         InventoryTickContext::tick_player_inventory(&self.get_world(), self);
         if self.is_flying() && !self.is_passenger() {
             self.reset_fall_distance();
