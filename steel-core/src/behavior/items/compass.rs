@@ -119,13 +119,13 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::bootstrap::init_globals_once;
+    use crate::behavior::init_behaviors;
     use crate::entity::LivingEntity;
     use crate::test_support::{TestPlayerBuilder, fresh_test_world, insert_ready_full_chunk};
     use glam::DVec3;
     use steel_registry::blocks::properties::Direction;
     use steel_registry::items::item::BlockHitResult;
-    use steel_registry::vanilla_items;
+    use steel_registry::{init_vanilla_registry, vanilla_items};
     use steel_utils::types::InteractionHand;
     use steel_utils::types::UpdateFlags;
     use steel_utils::{BlockPos, ChunkPos};
@@ -133,7 +133,8 @@ mod tests {
 
     #[test]
     fn compass_binds_to_lodestone_and_invalidates_when_removed() {
-        init_globals_once();
+        init_vanilla_registry();
+        init_behaviors();
 
         let world = fresh_test_world("compass_test_world");
         let pos = BlockPos::new(0, 64, 0);
@@ -210,7 +211,8 @@ mod tests {
 
     #[test]
     fn compass_invalidates_target_outside_world_bounds() {
-        init_globals_once();
+        init_vanilla_registry();
+        init_behaviors();
 
         let world = fresh_test_world("compass_bounds_test_world");
         let player = TestPlayerBuilder::new(Arc::clone(&world), "CompassTester", 1)

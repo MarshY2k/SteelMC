@@ -7,7 +7,7 @@ use crate::chunk::light::{
 use crate::chunk::paletted_container::PalettedContainer;
 use crate::chunk::section::{ChunkSection, SectionHolder, Sections};
 use crate::chunk::{Chunk, status::ChunkStatus};
-use crate::chunk_saver::bit_pack::{bits_for_palette_len, pack_indices, unpack_indices};
+use crate::chunk_saver::bit_pack::{bits_for_palette_len, pack_indices_from_iter, unpack_indices};
 use crate::entity::{
     ENTITIES, Entity, EntityBase, EntityBaseSaveData, EntityFireFreezeState, EntityLoadRequest,
     MAX_ENTITY_TAGS, RemovalReason, SharedEntity,
@@ -69,9 +69,6 @@ mod ticks;
 
 #[cfg(test)]
 mod tests;
-
-const ENTITY_LOAD_MAX_HORIZONTAL_POSITION: f64 = 3.000_051_2E7;
-const ENTITY_LOAD_MAX_VERTICAL_POSITION: f64 = 2.0E7;
 
 /// Converts `Option<Direction>` to the vanilla 2D data value encoding for persistence.
 /// -1 = none, 0 = south, 1 = west, 2 = north, 3 = east.

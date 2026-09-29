@@ -1,6 +1,3 @@
-use steel_utils::{Identifier, translations};
-use text_components::TextComponent;
-
 use super::super::{
     brigadier::{ArgumentType, CommandNodeBuilder, CommandSyntaxError},
     execution::{
@@ -9,6 +6,9 @@ use super::super::{
     },
     registration::CommandRegistration,
 };
+use crate::command::execution::FixedSuggestionProvider;
+use steel_utils::{Identifier, translations};
+use text_components::TextComponent;
 
 pub(super) fn registration() -> CommandRegistration<CommandSource> {
     CommandRegistration::new(Identifier::vanilla_static("tick"), |_| command())
@@ -19,32 +19,41 @@ pub(super) fn registration() -> CommandRegistration<CommandSource> {
         .subcommand_permission(["freeze"])
 }
 
+pub const DEFAULT_TICK_RATE: &str = "20";
+
 fn command() -> CommandNodeBuilder<CommandSource, SteelCommandRuntime> {
     literal("tick")
         .then(literal("query").executes(query_tick))
         .then(
-            literal("rate")
-                .then(argument("rate", ArgumentType::float(1.0, 10_000.0)).executes(set_tick_rate)),
+            literal("rate").then(
+                argument("rate", ArgumentType::float(1.0, 10_000.0))
+                    .suggests(FixedSuggestionProvider::new(&[DEFAULT_TICK_RATE]))
+                    .executes(set_tick_rate),
+            ),
         )
         .then(
             literal("step")
                 .executes(|context| step(context, 1))
                 .then(literal("stop").executes(stop_step))
                 .then(
-                    argument("time", SteelArgumentType::time(1)).executes(|context| {
-                        let ticks = context.time("time")?;
-                        step(context, ticks)
-                    }),
+                    argument("time", SteelArgumentType::time(1))
+                        .suggests(FixedSuggestionProvider::new(&["1t", "1s"]))
+                        .executes(|context| {
+                            let ticks = context.time("time")?;
+                            step(context, ticks)
+                        }),
                 ),
         )
         .then(
             literal("sprint")
                 .then(literal("stop").executes(stop_sprint))
                 .then(
-                    argument("time", SteelArgumentType::time(1)).executes(|context| {
-                        let ticks = context.time("time")?;
-                        sprint(context, ticks)
-                    }),
+                    argument("time", SteelArgumentType::time(1))
+                        .suggests(FixedSuggestionProvider::new(&["60s", "1d", "3d"]))
+                        .executes(|context| {
+                            let ticks = context.time("time")?;
+                            sprint(context, ticks)
+                        }),
                 ),
         )
         .then(literal("unfreeze").executes(|context| set_frozen(context, false)))

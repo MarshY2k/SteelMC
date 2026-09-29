@@ -18,6 +18,7 @@ mod list;
 mod locate;
 mod operator;
 mod perms;
+mod playsound;
 mod return_command;
 mod seed;
 mod setblock;
@@ -25,6 +26,7 @@ mod setidletimeout;
 mod setworldspawn;
 mod spawnpoint;
 mod stop;
+mod stopsound;
 mod summon;
 mod teleport;
 mod tellraw;
@@ -81,6 +83,7 @@ pub(crate) fn create_registered_dispatcher(
     builder.register(locate::registration())?;
     builder.register(operator::op_registration())?;
     builder.register(perms::registration())?;
+    builder.register(playsound::registration())?;
     builder.register(return_command::registration())?;
     builder.register(seed::registration())?;
     builder.register(setblock::registration())?;
@@ -88,6 +91,7 @@ pub(crate) fn create_registered_dispatcher(
     builder.register(setidletimeout::registration())?;
     builder.register(setworldspawn::registration())?;
     builder.register(stop::registration())?;
+    builder.register(stopsound::registration())?;
     builder.register(summon::registration())?;
     builder.register(teleport::registration())?;
     builder.register(tellraw::registration())?;
@@ -159,6 +163,7 @@ mod tests {
                 "locate",
                 "op",
                 "perms",
+                "playsound",
                 "return",
                 "seed",
                 "setblock",
@@ -166,6 +171,7 @@ mod tests {
                 "setidletimeout",
                 "setworldspawn",
                 "stop",
+                "stopsound",
                 "summon",
                 "teleport",
                 "tp",
